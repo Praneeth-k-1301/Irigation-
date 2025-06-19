@@ -4,14 +4,75 @@ import joblib
 import numpy as np
 from datetime import datetime
 import warnings
+import requests
+import tempfile
+import os
 warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-model = joblib.load("crop_model.pkl")
-scaler = joblib.load("crop_scaler.pkl")
-encoder = joblib.load("crop_encoder.pkl")
+# GitHub Raw URLs for model files (using LFS)
+# Updated with your actual GitHub repository
+GITHUB_MODEL_URLS = {
+    'model': 'https://github.com/Praneeth-k-1301/Irigation-/raw/main/model/crop_model.pkl',
+    'scaler': 'https://github.com/Praneeth-k-1301/Irigation-/raw/main/model/crop_scaler.pkl',
+    'encoder': 'https://github.com/Praneeth-k-1301/Irigation-/raw/main/model/crop_encoder.pkl'
+}
+
+def download_model_from_github(url, filename):
+    """Download model file from GitHub"""
+    try:
+        print(f"📥 Downloading {filename} from GitHub...")
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+
+        # Save to temporary file
+        temp_path = os.path.join(tempfile.gettempdir(), filename)
+        with open(temp_path, 'wb') as f:
+            f.write(response.content)
+
+        print(f"✅ Downloaded {filename} successfully")
+        return temp_path
+    except Exception as e:
+        print(f"❌ Failed to download {filename}: {e}")
+        return None
+
+def load_models():
+    """Load models from local files (included in repository)"""
+    global model, scaler, encoder
+
+    try:
+        # Load from local files (models included in repo)
+        model = joblib.load("crop_model.pkl")
+        scaler = joblib.load("crop_scaler.pkl")
+        encoder = joblib.load("crop_encoder.pkl")
+        print("✅ Models loaded from local files successfully!")
+
+    except Exception as e:
+        print(f"❌ Failed to load local files: {e}")
+        print("🔄 Trying to download from GitHub as backup...")
+
+        try:
+            # Backup: Try to download from GitHub
+            model_path = download_model_from_github(GITHUB_MODEL_URLS['model'], 'crop_model.pkl')
+            scaler_path = download_model_from_github(GITHUB_MODEL_URLS['scaler'], 'crop_scaler.pkl')
+            encoder_path = download_model_from_github(GITHUB_MODEL_URLS['encoder'], 'crop_encoder.pkl')
+
+            if model_path and scaler_path and encoder_path:
+                model = joblib.load(model_path)
+                scaler = joblib.load(scaler_path)
+                encoder = joblib.load(encoder_path)
+                print("🔥 Models loaded from GitHub backup successfully!")
+            else:
+                raise Exception("Could not load models from any source")
+
+        except Exception as github_error:
+            print(f"❌ GitHub backup failed: {github_error}")
+            raise Exception("Could not load models from local files or GitHub")
+
+# Load models on startup
+load_models()
 
 # Debug: Print model information
 print(f"🌾 Available crops: {encoder.classes_}")
@@ -49,12 +110,12 @@ CROP_DATA = {
         'growing_season': 150,
         'optimal_temp': (20, 32),
         'optimal_humidity': (55, 75),
-        'description': 'Moderate water requirement, heat tolerant cash crop',
+        'description': 'Heat tolerant cash crop, requires balanced nutrition',
         'fertilizer': {
             'primary': 'NPK (17-17-17)',
-            'secondary': 'Urea, DAP',
-            'organic': 'Compost, FYM',
-            'micronutrients': 'Zinc, Boron'
+            'secondary': 'Urea, SSP, MOP',
+            'organic': 'Cotton cake, Neem cake, FYM',
+            'micronutrients': 'Zinc, Boron, Iron, Manganese'
         }
     },
     'Paddy': {
@@ -327,22 +388,26 @@ def get_smart_prediction(crop_classes, probabilities, temp, humidity, moisture, 
                 score *= 1.2  # Good moisture range
 
         elif crop == 'Cotton':
-            # Cotton is heat tolerant
+            # Cotton is heat tolerant and prefers dry conditions
             if is_hot:
-                score *= 1.4  # Boost for hot weather
+                score *= 1.8  # Strong boost for hot weather
             if is_cold:
-                score *= 0.5  # Reduce for cold weather
-            if soil_type == 1:  # Sandy soil is good for cotton
-                score *= 1.2
+                score *= 0.3  # Strong penalty for cold weather
+            if soil_type == 1:  # Sandy soil is ideal for cotton
+                score *= 1.5
+            if is_dry or is_dry_soil:
+                score *= 1.3  # Cotton likes dry conditions
+            if temp > 32:  # Very hot conditions favor cotton
+                score *= 1.6
 
         elif crop == 'Pulses':
-            # Pulses are versatile but prefer moderate conditions
+            # Pulses are versatile but reduce over-prediction
             if temp >= 20 and temp <= 30:
                 score *= 1.1
             if moisture >= 40 and moisture <= 70:
                 score *= 1.1
-            # Slight penalty to reduce over-prediction
-            score *= 0.9
+            # Reduce over-prediction of pulses
+            score *= 0.7  # Stronger penalty to allow other crops
 
         adjusted_scores[crop] = score
 
@@ -509,23 +574,23 @@ def predict_crop():
         humidity_moisture_diff = humidity - moisture
         temp_humidity_index = (temp * humidity) / 100
 
-        # Improve feature engineering for better crop diversity
-        # Vary soil chemistry based on soil type and conditions
-        if soil_type == 0:  # Loamy soil
-            ph_level = 6.8 + (temp - 25) * 0.02  # Slightly alkaline in hot weather
-            nitrogen_level = 55 + moisture * 0.3  # More N in moist loamy soil
-            phosphorus_level = 35 + (humidity - 60) * 0.2
-            potassium_level = 45 + temp * 0.5
-        elif soil_type == 1:  # Sandy soil
-            ph_level = 6.2 + (temp - 20) * 0.03  # More acidic, varies with temp
-            nitrogen_level = 35 + moisture * 0.4  # Lower base N, depends on moisture
-            phosphorus_level = 25 + (humidity - 50) * 0.3
-            potassium_level = 30 + temp * 0.7
-        else:  # Clay soil (soil_type == 2)
-            ph_level = 7.2 + (moisture - 50) * 0.02  # Alkaline, varies with moisture
-            nitrogen_level = 65 + (temp - 25) * 0.5  # High N retention
-            phosphorus_level = 40 + moisture * 0.2
-            potassium_level = 55 + humidity * 0.3
+        # Enhanced feature engineering for better crop diversity and realistic soil analysis
+        # Vary soil chemistry based on soil type, weather, and environmental conditions
+        if soil_type == 0:  # Loamy soil - balanced, fertile
+            ph_level = 6.5 + (temp - 25) * 0.03 + (moisture - 50) * 0.01
+            nitrogen_level = 50 + moisture * 0.4 + (humidity - 60) * 0.2
+            phosphorus_level = 30 + (temp - 20) * 0.8 + rainfall * 2
+            potassium_level = 40 + temp * 0.6 + (moisture - 40) * 0.3
+        elif soil_type == 1:  # Sandy soil - well-drained, lower nutrients
+            ph_level = 6.0 + (temp - 20) * 0.04 + (rainfall * 0.1)  # More acidic, leaching
+            nitrogen_level = 25 + moisture * 0.5 + (temp - 25) * 0.3  # Lower retention
+            phosphorus_level = 20 + (humidity - 50) * 0.4 + moisture * 0.2
+            potassium_level = 25 + temp * 0.8 + (humidity - 60) * 0.2
+        else:  # Clay soil (soil_type == 2) - nutrient-rich, alkaline
+            ph_level = 7.0 + (moisture - 50) * 0.03 + (temp - 25) * 0.02
+            nitrogen_level = 60 + (temp - 25) * 0.6 + moisture * 0.2  # High retention
+            phosphorus_level = 35 + moisture * 0.3 + (humidity - 70) * 0.3
+            potassium_level = 50 + humidity * 0.4 + (temp - 20) * 0.4
 
         # Ensure values are within realistic ranges
         ph_level = max(5.5, min(8.5, ph_level))
