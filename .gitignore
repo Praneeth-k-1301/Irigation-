@@ -67,3 +67,12 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Large ML Model Files (too big for GitHub)
+model/crop_model.pkl
+model/crop_scaler.pkl
+model/crop_encoder.pkl
+*.pkl
+*.joblib
+*.h5
+*.model
