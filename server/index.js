@@ -497,8 +497,10 @@ function calculateWeatherFavorability(temperature, humidity, cropName) {
 }
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`✅ Node server running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Node server running at http://0.0.0.0:${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://0.0.0.0:${PORT}/health`);
 
   // Start hourly refresh cron job
   if (process.env.NODE_ENV === 'production') {

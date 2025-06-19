@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: irrigation-predictor-backend
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENWEATHER_API_KEY
+        value: b8e566b5b5e5b5b5b5b5b5b5b5b5b5b5
+    healthCheckPath: /health
