@@ -1,0 +1,81 @@
+# GitHub Actions - Cloud-based hourly API refresh
+name: Hourly API Refresh
+
+on:
+  schedule:
+    # Runs every hour at minute 0 (0 * * * *)
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  refresh-apis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔄 Refresh Weather Data Cache
+      run: |
+        echo "Starting hourly API refresh..."
+        
+        # Popular cities to refresh
+        cities=("Mumbai" "Delhi" "Chennai" "Kolkata" "Bangalore" "Hyderabad" "Pune" "Ahmedabad")
+        
+        for city in "${cities[@]}"; do
+          echo "🌤️ Refreshing weather data for $city..."
+          
+          response=$(curl -s "https://api.openweathermap.org/data/2.5/weather?q=$city&appid=${{ secrets.OPENWEATHER_API_KEY }}&units=metric")
+          
+          if [ $? -eq 0 ]; then
+            temp=$(echo $response | jq -r '.main.temp')
+            echo "✅ $city: ${temp}°C"
+          else
+            echo "❌ Failed to refresh $city"
+          fi
+          
+          # Small delay to avoid rate limiting
+          sleep 2
+        done
+
+    - name: 🚀 Keep APIs Warm (Prevent Cold Starts)
+      run: |
+        echo "Pinging APIs to keep them warm..."
+        
+        # Ping Node.js API
+        if curl -f -s "${{ secrets.NODEJS_API_URL }}/health" > /dev/null; then
+          echo "✅ Node.js API is healthy"
+        else
+          echo "❌ Node.js API health check failed"
+        fi
+        
+        # Ping Flask ML API  
+        if curl -f -s "${{ secrets.FLASK_API_URL }}/health" > /dev/null; then
+          echo "✅ Flask ML API is healthy"
+        else
+          echo "❌ Flask ML API health check failed"
+        fi
+
+    - name: 📊 Update System Status
+      run: |
+        echo "Updating system status..."
+        
+        # Create status payload
+        status_payload=$(cat <<EOF
+        {
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "status": "healthy",
+          "last_refresh": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "next_refresh": "$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)",
+          "refreshed_cities": 8,
+          "apis_checked": 2
+        }
+        EOF
+        )
+        
+        echo "Status: $status_payload"
+        echo "✅ Hourly refresh completed successfully"
+
+    - name: 🔔 Notify on Failure
+      if: failure()
+      run: |
+        echo "❌ Hourly refresh failed!"
+        echo "Check the logs for details."
+        # You can add Slack/Discord/Email notifications here

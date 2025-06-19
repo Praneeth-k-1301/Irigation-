@@ -1,0 +1,32 @@
+{
+  "name": "crop-predictor-cloud-functions",
+  "version": "1.0.0",
+  "description": "Cloud Run Functions for Crop Prediction System",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=processWeatherData",
+    "deploy": "gcloud functions deploy processWeatherData --runtime nodejs18 --trigger-http --allow-unauthenticated",
+    "deploy-analytics": "gcloud functions deploy cropAnalytics --runtime nodejs18 --trigger-http --allow-unauthenticated",
+    "deploy-irrigation": "gcloud functions deploy irrigationScheduler --runtime nodejs18 --trigger-http --allow-unauthenticated",
+    "deploy-all": "npm run deploy && npm run deploy-analytics && npm run deploy-irrigation"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.3.0",
+    "@google-cloud/firestore": "^7.1.0",
+    "@google-cloud/storage": "^7.7.0",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "keywords": [
+    "cloud-functions",
+    "crop-prediction",
+    "weather-processing",
+    "agriculture",
+    "serverless"
+  ],
+  "author": "Crop Prediction Team",
+  "license": "MIT"
+}

@@ -1,0 +1,36 @@
+{
+  "name": "crop-prediction-app",
+  "version": 2,
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "functions": {
+    "client/api/cron/refresh-data.js": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/refresh-data",
+      "schedule": "0 * * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "client/$1"
+    }
+  ],
+  "env": {
+    "REACT_APP_API_URL": "@react_app_api_url",
+    "REACT_APP_OPENWEATHER_API_KEY": "@react_app_openweather_api_key",
+    "OPENWEATHER_API_KEY": "@openweather_api_key",
+    "CRON_SECRET": "@cron_secret"
+  }
+}

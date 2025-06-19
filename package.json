@@ -1,0 +1,21 @@
+{
+  "name": "irrigation-predictor",
+  "version": "1.0.0",
+  "description": "Smart Crop Prediction System with ML",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "cd server && npm install && npm start",
+    "dev": "cd server && npm run dev",
+    "build": "cd server && npm install"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["agriculture", "ml", "crop-prediction", "irrigation"],
+  "author": "Praneeth",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Praneeth-k-1301/irrigation-predictor.git"
+  }
+}

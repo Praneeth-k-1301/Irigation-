@@ -1,0 +1,17 @@
+# Railway deployment configuration
+
+[[services]]
+name = "nodejs-api"
+source = "server"
+build = "npm install"
+start = "node index.js"
+
+[[services]]
+name = "flask-ml-api"
+source = "model"
+build = "pip install -r requirements.txt"
+start = "python app.py"
+
+[env]
+NODE_ENV = "production"
+FLASK_ENV = "production"
