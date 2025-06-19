@@ -72,15 +72,18 @@ app.post("/api/crop", async (req, res) => {
 
     console.log("Sending to Flask:", payload);
 
-    const flaskRes = await axios.post("http://localhost:5000/predict", payload);
+    const flaskRes = await axios.post("https://irigation-ml-model-5m7c.onrender.com/predict", payload);
 
     // Get the crop prediction from Flask
-    const cropPrediction = flaskRes.data.prediction || 'Wheat';
+    const cropPrediction = flaskRes.data.predicted_crop || 'Wheat';
+
+    console.log("Flask response:", flaskRes.data);
+    console.log("Extracted crop prediction:", cropPrediction);
 
     // Generate all the detailed analysis
     const irrigation = calculateIrrigationNeed(cropPrediction, { temperature: temp, humidity: humidity, rainfall: rainfall }, moisture);
     const fertilizer = getFertilizerRecommendation(cropPrediction, soilType);
-    const nutrients = generateNutrientAnalysis(cropPrediction, soilType, moisture);
+    const nutrients = generateNutrientAnalysis(cropPrediction, soilType, moisture, temp, humidity);
     const warnings = generateWarnings({ temperature: temp, humidity: humidity, rainfall: rainfall }, moisture, cropPrediction);
 
     // Generate comprehensive response matching your frontend expectations
@@ -379,25 +382,41 @@ function getFertilizerRecommendation(cropName, soilType) {
   };
 }
 
-function generateNutrientAnalysis(cropName, soilType, moisture) {
-  // Base nutrient levels based on soil type
-  const baseNutrients = {
-    0: { nitrogen: 'High', phosphorous: 'Medium', potassium: 'High', ph: 6.8, ph_status: 'Slightly Acidic' }, // Loamy
-    1: { nitrogen: 'Low', phosphorous: 'Low', potassium: 'Medium', ph: 7.2, ph_status: 'Neutral' }, // Sandy
-    2: { nitrogen: 'Medium', phosphorous: 'High', potassium: 'Low', ph: 6.5, ph_status: 'Acidic' } // Clay
-  };
+function generateNutrientAnalysis(cropName, soilType, moisture, temperature, humidity) {
+  // Enhanced nutrient analysis based on soil type, weather, and environmental conditions
+  let nitrogen, phosphorous, potassium, ph, ph_status;
 
-  const nutrients = baseNutrients[soilType] || baseNutrients[0];
-
-  // Adjust based on moisture
-  if (moisture < 30) {
-    nutrients.nitrogen = 'Low';
-    nutrients.phosphorous = 'Low';
-  } else if (moisture > 70) {
-    nutrients.potassium = 'Medium';
+  // Base values vary significantly by soil type and conditions
+  if (soilType === 0) { // Loamy soil - most fertile
+    nitrogen = moisture > 60 ? 'High' : moisture > 30 ? 'Medium' : 'Low';
+    phosphorous = temperature > 25 ? 'High' : 'Medium';
+    potassium = humidity > 70 ? 'High' : 'Medium';
+    ph = 6.5 + (temperature - 25) * 0.02;
+  } else if (soilType === 1) { // Sandy soil - well-drained, lower nutrients
+    nitrogen = moisture > 50 ? 'Medium' : 'Low';
+    phosphorous = temperature > 30 ? 'Medium' : 'Low';
+    potassium = humidity > 60 ? 'Medium' : 'Low';
+    ph = 6.0 + (temperature - 20) * 0.03;
+  } else { // Clay soil - nutrient-rich but drainage issues
+    nitrogen = moisture > 40 ? 'High' : 'Medium';
+    phosphorous = temperature > 28 ? 'High' : 'Medium';
+    potassium = humidity > 75 ? 'High' : 'Medium';
+    ph = 7.0 + (moisture - 50) * 0.02;
   }
 
-  return nutrients;
+  // Determine pH status
+  if (ph < 6.0) ph_status = 'Acidic';
+  else if (ph < 6.5) ph_status = 'Slightly Acidic';
+  else if (ph < 7.5) ph_status = 'Neutral';
+  else ph_status = 'Alkaline';
+
+  return {
+    nitrogen,
+    phosphorous,
+    potassium,
+    ph: Math.round(ph * 10) / 10,
+    ph_status
+  };
 }
 
 function generateWarnings(weatherData, soilMoisture, cropName) {
