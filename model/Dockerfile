@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY app.py .
+COPY *.pkl .
 
 # Expose port
 EXPOSE 10000

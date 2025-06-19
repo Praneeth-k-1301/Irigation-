@@ -18,11 +18,12 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypothesis
-
 .DS_Store
 .vscode
 *.swp
 *.swo
-
-# Model files are needed, so don't ignore them
-# *.pkl
+node_modules
+package.json
+package-lock.json
+*.md
+test_*.py
